@@ -1,0 +1,15 @@
+<!doctype html>
+<html>
+	<head><title>Blog Entries</title></head>
+	<body>
+		<h1>Blog of entries</h1>
+		{% for entry in entries %}
+			<p> {{ entry.title }} </p>
+			<p> {{ entry.body }} </p>
+			<p>{{ entry.created|datetimeformat('%B %d, %Y') }}</p>
+			{% if img_url %}
+				<img src="{{img_url}}">
+			{% endif %}
+		{% endfor %}
+	</body>
+</html>
