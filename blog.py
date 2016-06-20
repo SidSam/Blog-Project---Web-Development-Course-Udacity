@@ -1,3 +1,5 @@
+from google.appengine.api import memcache
+import time
 import os
 import webapp2
 import jinja2
@@ -6,6 +8,7 @@ import random, string
 import re
 import urllib2
 import json
+import logging
 from xml.dom import minidom
 
 # MAPPING FUNCTIONALITY
@@ -74,7 +77,7 @@ def render_str(template, **params):
 
 IP_URL = 'http://ip-api.com/xml/'
 def get_coords(ip):
-	ip = '4.2.2.2'
+	# ip = '4.2.2.2'
 	url = IP_URL + ip
 	content = None
 	try:
@@ -123,6 +126,23 @@ class User(db.Model):
 			return u
 
 # MAIN FUNCTIONS
+
+def top_entries(update = False):
+	key = 'top'
+	# logging.error("inside top_entries")
+	# logging.error(update)
+	data = memcache.get(key='top')
+	if not update and data:
+		# logging.error('inside if')
+		entries = data
+	else:
+		logging.error("DB QUERY")
+		entries = db.GqlQuery('select * from Entries order by created desc limit 10')
+		# Prevent the running of multiple queries
+		entries = list(entries)
+		memcache.add(key='top', value=entries)
+	return entries
+
 class MainPage(webapp2.RequestHandler):
 	def get(self):
 		# self.response.headers['Content-Type'] = 'text/plain'
@@ -138,11 +158,7 @@ class MainPage(webapp2.RequestHandler):
 		# self.response.headers.add_header('Set-Cookie', 'visits=%s' % new_cookie_val)
 		# self.response.write(self.request.remote_addr)
 		# self.response.write(repr(get_coords(self.request.remote_addr)))
-		entries = db.GqlQuery('select * from Entries order by created desc limit 10')
-		
-		# Prevent the running of multiple queries
-		entries = list(entries)
-
+		entries = top_entries()
 		# find which entries have coordinates
 		points = filter(None, (e.coords for e in entries))
 
@@ -170,9 +186,14 @@ class NewPost(webapp2.RequestHandler):
 			coords = get_coords(self.request.remote_addr)
 			if coords:
 				e.coords = coords
-			length = db.GqlQuery('select * from Entries order by created desc').count()
+			# length = db.GqlQuery('select * from Entries order by created desc').count()
 			e.put()
-			self.redirect('/newpost/' + str(length+1))
+			# time.sleep(.01)
+			# logging.error("inside newpost's post")
+			memcache.flush_all()
+			# top_entries(True)
+			self.redirect('/')
+			# self.redirect('/newpost/' + str(length+1))
 		else:
 			self.response.write(render_str('newpost.html', error="Please type in a title and some content"))
 
@@ -271,7 +292,7 @@ class MainPageJson(webapp2.RequestHandler):
 
 class PostJson(webapp2.RequestHandler):
 	def get(self):
-		
+		pass
 
 # APP HANDLERS
 app = webapp2.WSGIApplication([('/', MainPage),
@@ -281,6 +302,6 @@ app = webapp2.WSGIApplication([('/', MainPage),
 								('/welcome', Welcome),
 								('/login', Login),
 								('/logout', Logout),
-								('/.json', MainPageJson),
-								('/newpost/(\d+)', PostJson)
+								('/.json', MainPageJson)
+								#('/newpost/(\d+)', PostJson)
 								], debug=True)
