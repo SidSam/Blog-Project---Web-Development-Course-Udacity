@@ -10,7 +10,7 @@ import urllib2
 import json
 import logging
 from xml.dom import minidom
-
+from datetime import datetime
 # MAPPING FUNCTIONALITY
 GMAPS_URL = 'https://maps.googleapis.com/maps/api/staticmap?size=380x263&'
 def gmaps_img(points):
@@ -68,6 +68,27 @@ def datetimeformat(value, format='%H:%M / %d-%m-%Y'):
     return value.strftime(format)
 
 jinja_env.filters['datetimeformat'] = datetimeformat
+
+# QUERY AGE FUNCTIONS
+def age_set(key, val):
+	save_time = datetime.utcnow()
+	memcache.set(key, (val, save_time))
+
+def age_get(key):
+	r = memcache.get(key)
+	if r:
+		val, save_time = r 
+		age = (datetime.utcnow() - save_time).total_seconds()
+	else:
+		val, age = None, 0
+	return val, age
+
+def age_str(age):
+	s = 'queried %s seconds ago'
+	age = int(age)
+	if age == 1:
+		s = s.replace('seconds', 'second')
+	return s % age
 
 # HELPER FUNCTION
 def render_str(template, **params):
@@ -131,17 +152,14 @@ def top_entries(update = False):
 	key = 'top'
 	# logging.error("inside top_entries")
 	# logging.error(update)
-	data = memcache.get(key='top')
-	if not update and data:
-		# logging.error('inside if')
-		entries = data
-	else:
+	entries, age = age_get('top')
+	if update or entries is None:
 		logging.error("DB QUERY")
 		entries = db.GqlQuery('select * from Entries order by created desc limit 10')
 		# Prevent the running of multiple queries
 		entries = list(entries)
-		memcache.add(key='top', value=entries)
-	return entries
+		age_set(key, entries)
+	return entries, age
 
 class MainPage(webapp2.RequestHandler):
 	def get(self):
@@ -158,7 +176,7 @@ class MainPage(webapp2.RequestHandler):
 		# self.response.headers.add_header('Set-Cookie', 'visits=%s' % new_cookie_val)
 		# self.response.write(self.request.remote_addr)
 		# self.response.write(repr(get_coords(self.request.remote_addr)))
-		entries = top_entries()
+		entries, age = top_entries()
 		# find which entries have coordinates
 		points = filter(None, (e.coords for e in entries))
 
@@ -169,7 +187,7 @@ class MainPage(webapp2.RequestHandler):
 		
 		# now display the url		
 		# self.response.write(repr(points))
-		self.response.write(render_str('mainpage.html', entries=entries, img_url = img_url))
+		self.response.write(render_str('mainpage.html', entries=entries, img_url = img_url, age = age_str(age)))
 	
 class NewPost(webapp2.RequestHandler):
 	def get(self):
@@ -190,8 +208,7 @@ class NewPost(webapp2.RequestHandler):
 			e.put()
 			# time.sleep(.01)
 			# logging.error("inside newpost's post")
-			memcache.flush_all()
-			# top_entries(True)
+			top_entries(True)
 			self.redirect('/')
 			# self.redirect('/newpost/' + str(length+1))
 		else:
