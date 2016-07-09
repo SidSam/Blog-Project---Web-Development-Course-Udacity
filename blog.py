@@ -296,10 +296,7 @@ class Welcome(webapp2.RequestHandler):
 
 class MainPageJson(webapp2.RequestHandler):
 	def get(self):
-		entries = db.GqlQuery('select * from Entries order by created desc limit 10')
-			
-		# Prevent the running of multiple queries
-		entries = list(entries)
+		entries, age = top_entries()
 		json_txt = ''
 		for e in entries:
 			json_txt += json.dumps(e.as_dict())

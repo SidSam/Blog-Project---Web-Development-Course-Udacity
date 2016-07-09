@@ -1,18 +1,30 @@
 <!doctype html>
 <html>
-	<head><title>Blog Entries</title></head>
+	<head>
+		<title>Blog Entries</title>
+		<link rel="stylesheet" type="text/css" href="/static/bootstrap.css">
+		<link rel="stylesheet" type="text/css" href="/static/style.css">
+	</head>
 	<body>
-		<h1>Blog of entries</h1>
-		{% for entry in entries %}
-			<p> {{ entry.title }} </p>
-			<p> {{ entry.body }} </p>
-			<p>{{ entry.created|datetimeformat('%B %d, %Y') }}</p>
-			{% if img_url %}
-				<img src="{{img_url}}">
-			{% endif %}
-		{% endfor %}
-		<div class='age'>
-			{{ age }}
+		<div class='container'>
+			<div class="row">
+				<h1>Blog of entries</h1>
+					{% for entry in entries %}
+					<div class='col-md-12 text-left'>
+						<p> {{ entry.title }} </p>
+						<p> {{ entry.body }} </p>
+						<p>{{ entry.created|datetimeformat('%B %d, %Y') }}</p>
+						{% if entry.coords %}
+							<img src="https://maps.googleapis.com/maps/api/staticmap?size=380x263&markers={{ entry.coords.lat }},{{ entry.coords.lon }}">
+						{% endif %}
+					</div>
+				{% endfor %}
+				<div class='age'>
+					{{ age }}
+				</div>	
+			</div>
 		</div>
+		
+		
 	</body>
 </html>
